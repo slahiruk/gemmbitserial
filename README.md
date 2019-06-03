@@ -1,3 +1,6 @@
+* note that this is not the original gemmbitserial library. This is slightly modified for the EECS-BISMO
+repository
+
 # gemmbitserial
 
 gemmbitserial is a simple, header-only C++ library for fast multiplication of few-bit integer matrices. It is primarily intended for running quantized neural network inference on CPUs, which require fast few-bit integer matrix multiplication.
@@ -29,3 +32,8 @@ rows depth columns lhs_bitwidth rhs_bitwidth lhs_signed rhs_signed number_of_sec
 
 For instance, entering the following in stdin will run a 8x8192x8 binary unsigned matrix multiply for 20 seconds, and report the GOPS:
 8 8192 8 1 1 0 0 20
+
+
+## Modifications:
+Please have a look at Jupyter Notebooks that make use of cling to see the usage 
+of the gemmbitserial library and it's modifications
