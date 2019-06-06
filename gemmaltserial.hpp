@@ -380,7 +380,7 @@ static uint64_t finetuneBlockSize(uint64_t rows, uint64_t bs_max, uint64_t bs_di
   return best_cand;
 }
 
-  
+
 class GEMMContext {
 public:
   BitSerialMatrix lhs, rhs;
@@ -415,7 +415,7 @@ public:
   }
 };
 
-  
+
 // Base functionality for allocating a GEMM context. Do not use directly,
 // use the platform-provided allocGEMMContext instead.
 static GEMMContext allocGEMMContext_base(
@@ -470,16 +470,22 @@ public:
 
   /* Allocate buffer space for a RowInterleavedBitSerialMatrix */
   static RowInterleavedBitSerialMatrix alloc(uint64_t nbits, uint64_t nrows, uint64_t ncols, bool issigned, uint64_t rowalign = 1, uint64_t colalign = 64) {
+    /* row align --> for col_major
+       row align 
+     */
     RowInterleavedBitSerialMatrix ribsm;
     ribsm.nbits = nbits;
     ribsm.nrows = nrows;
     ribsm.ncols = ncols;
-    ribsm.nrows_a = alignTo(nrows, rowalign);
+    ribsm.nrows_a = alignTo(nrows, rowalign); 
     ribsm.ncols_a = alignTo(ncols, colalign);
     ribsm.issigned = issigned;
-    // -- change def 
-    uint64_t wordsPerBitplane = ribsm.wordsPerBitplane();
-    ribsm.data = new uint64_t[nbits * wordsPerBitplane];
+    // -- change def
+    uint64_t wordsPerRowplane = ribsm.wordsPerRowplane();
+    uint64_t wordsPerBit = ribsm.wordsPerBit();
+    ribsm.wrp = wordsPerRowplane;
+    ribsm.wpb = wordsPerBit;
+    ribsm.data = new uint64_t[nrows * wordsPerRowplane];
     return ribsm;
   }
 
@@ -497,7 +503,8 @@ public:
   uint64_t nrows_a;     // number of allocated rows
   uint64_t ncols_a;     // number of allocated columns
   uint64_t * data;      // data buffer, layout [nbits][nrows_a][ncols_a/64]
-
+  uint64_t wrp;         // words per rowplane
+  uint64_t wpb;         // words per bit
   // print key statistics about BitSerialMatrix to stdout
   void printSummary() {
     std::cout << "BitSerialMatrix" << std::endl;
@@ -506,7 +513,8 @@ public:
     std::cout << "Allocated size: " << nrows_a << " x " << ncols_a << std::endl;
   }
 
-  void printHex() {
+  // normal hex
+  void printNmHex() {
     for(int i = 0; i < nbits; i++) {
       std::cout << "Bit " << i << ":" << std::endl;
       for(int j = 0; j < nrows_a; j++) {
@@ -515,22 +523,37 @@ public:
         }
         std::cout << std::endl;
       }
-      std::cout << std::endl;
+     std::cout << std::endl;
     }
   }
 
+  // interleaved hex
+  void printIlHex() {
+    for(int i = 0; i < nrows_a; i++) {
+      std::cout << "Row " << i << ":" << std::endl;
+      for(int j = 0; j < nbits; j++) {
+        for(int k = 0; k < ncols_a/64; k++) {
+          std::cout << std::hex << word(i, j, k*64) << " " << std::dec;
+        }
+        std::cout << std::endl;
+      }
+      std::cout << std::endl;
+    }
+  }
+  
   // return whether the matrix contains bipolar binary {-1, +1} values
   inline bool isBipolar() const {
     return nbits == 1 && issigned;
   }
-  // needs duplicate function for interleaved rows
-  // number of storage words needed for each row
+  
+  // number of storage words needed for each bit
   inline uint64_t wordsPerBit() const {
     const uint64_t bitsPerWord = sizeof(uint64_t) * 8;
     return ncols_a / bitsPerWord;
-  }
-  // needs duplicate function for interleaved rows
-  // number of storage words needed for each bitplane (bit matrix)
+    }
+  
+  // duplicate function for interleaved rows
+  // storage words needed for each rowplane (Interleaved bit matrix)
   inline uint64_t wordsPerRowplane() const {
     return nbits * wordsPerBit();
   }
@@ -547,6 +570,7 @@ public:
     memset(data, 0, nrows * wordsPerRowplane() * sizeof(uint64_t));
   }
 
+
   // change word definition
   // set given bit to one
   inline void set(uint64_t bit, uint64_t row, uint64_t col) {
@@ -561,21 +585,32 @@ public:
 
   // change word definition
   // access the container word for a given bit
+  /*
   inline uint64_t & word(uint64_t bit, uint64_t row, uint64_t col) {
     // right shift by log2(bits per word) to get word index
     uint64_t colw = col >> 6;
     return data[bit * wordsPerBitplane() + row * wordsPerRow() + colw];
   }
+    */
 
-  //  
-  // get a pointer to a particular row
-  inline uint64_t * rowptr(uint64_t bit, uint64_t row) {
-    return &data[bit * wordsPerBitplane() + row * wordsPerRow()];
+
+  inline uint64_t & word(uint64_t bit, uint64_t row, uint64_t col) {
+    // right shift by log2(bits per word) to get word index
+    uint64_t colw = col >> 6;
+    return data[row * wordsPerRowplane() + bit * wordsPerBit() + colw];
   }
 
+
+  //
+  // get a pointer to a particular row
+  
+  inline uint64_t * rowptr( uint64_t row) {
+    return &data[row * wordsPerRowplane()];
+    }
+
   // get a pointer to a particular bit plane
-  inline uint64_t * bitplaneptr(uint64_t bit) {
-    return &data[bit * wordsPerBitplane()];
+  inline uint64_t * bitplaneptr(uint64_t bit, uint64_t row) {
+    return &data[row * wordsPerRowplane() + bit * wordsPerBit()];
   }
 
   uint64_t bitpos(uint64_t col) {
@@ -789,7 +824,7 @@ public:
 };
 
 
-  
+
 
 // generic implementations using regular & and __builtin_popcountll
 #include "arch-generic.hpp"
