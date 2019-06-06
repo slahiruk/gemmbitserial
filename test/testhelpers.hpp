@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdlib>
+#include <cassert>
 
 // Generate a random vector of -1 and +1 values of given dimension
 template <typename T>
