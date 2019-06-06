@@ -10,10 +10,16 @@ using namespace  std;
 
 int main(){
 
+  /*
+    typedefs for ease of use. Would like to see the functioning
+    of both the bsm and ribsm classes
+   */
 	typedef ags::RowInterleavedBitSerialMatrix RIBSM;
+	typedef ags::BitSerialMatrix BSM;
 
-	RIBSM rbsm;
-	cout <<"created";
+  RIBSM rbsm;
+  BSM    bsm;
+  cout <<"created";
 
 	size_t nrows_lhs = 2;
 	size_t nrows_rhs = 2;
@@ -33,11 +39,13 @@ int main(){
 
 
 	rbsm = RIBSM::alloc(nbits_lhs,nrows_lhs,ncols,sgn_lhs);
-	printf("Words per bit %ul \n",rbsm.wordsPerBit());
-	printf("Words per rowplane %ul \n",rbsm.wordsPerRowplane());
-	printf("testoutput");
-	rbsm.importRegular_naive(lhs);
+	bsm = BSM::alloc(nbits_lhs,nrows_lhs,ncols,sgn_lhs);
+	// rbsm.importRegular_naive(lhs);
+	rbsm.importRegular(lhs);
+	// bsm.importRegular_naive(lhs);
+	bsm.importRegular(lhs);
 	RIBSM::dealloc(rbsm);
+	BSM::dealloc(bsm);
 
 	}
 	
